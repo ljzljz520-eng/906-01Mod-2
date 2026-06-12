@@ -1,0 +1,63 @@
+
+
+services:
+  # MySQL 数据库
+  db:
+    image: mysql:8.0
+    container_name: torrent-db
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456
+      MYSQL_DATABASE: torrent_search
+      MYSQL_USER: baobei
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ubaobei", "-p123456"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - torrent-network
+
+  # 后端服务
+  backend:
+    build: ./backend-php
+    container_name: torrent-backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: baobei
+      DB_PASSWORD: 123456
+      DB_NAME: torrent_search
+    ports:
+      - "3002:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - torrent-network
+    restart: unless-stopped
+
+  # 前端服务
+  frontend:
+    build: ./frontend
+    container_name: torrent-frontend
+    ports:
+      - "3003:3000"
+    depends_on:
+      - backend
+    networks:
+      - torrent-network
+    restart: unless-stopped
+
+volumes:
+  db_data:
+    driver: local
+
+networks:
+  torrent-network:
+    driver: bridge
