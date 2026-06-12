@@ -6,11 +6,11 @@
         <div class="flex justify-between items-center h-16">
           <div class="flex items-center space-x-3">
             <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
             </svg>
-            <h1 class="text-2xl font-bold text-gray-900">Torrent 搜索引擎</h1>
+            <h1 class="text-2xl font-bold text-gray-900">开源资源索引站</h1>
           </div>
-          <nav class="flex space-x-4">
+          <nav class="flex space-x-2">
             <router-link
               to="/"
               class="px-4 py-2 rounded-lg font-medium transition-all duration-200"
@@ -21,6 +21,30 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <span>搜索</span>
+              </span>
+            </router-link>
+            <router-link
+              to="/radar"
+              class="px-4 py-2 rounded-lg font-medium transition-all duration-200"
+              :class="$route.path === '/radar' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-700 hover:bg-gray-100'"
+            >
+              <span class="flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />
+                </svg>
+                <span>镜像雷达</span>
+              </span>
+            </router-link>
+            <router-link
+              to="/history"
+              class="px-4 py-2 rounded-lg font-medium transition-all duration-200"
+              :class="$route.path === '/history' ? 'bg-purple-600 text-white shadow-lg' : 'text-gray-700 hover:bg-gray-100'"
+            >
+              <span class="flex items-center space-x-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>历史</span>
               </span>
             </router-link>
             <router-link

@@ -4,7 +4,7 @@ header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json; charset=UTF-8");
 header("Access-Control-Allow-Methods: GET,POST,PUT,DELETE,OPTIONS");
 header("Access-Control-Max-Age: 3600");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With, X-Admin-Name");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -18,25 +18,29 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 $api = new ApiController();
 
-// Simple Router
+// Health Check
 if ($uri === '/health' && $method === 'GET') {
     $api->healthCheck();
 } 
+// Providers
 elseif ($uri === '/api/providers' && $method === 'GET') {
     $api->getProviders();
 }
+// Torrent Search
 elseif (preg_match('#^/api/search/([^/]+)/([^/]+)(?:/([^/]+))?$#', $uri, $matches) && $method === 'GET') {
     $keyword = urldecode($matches[1]);
     $query = urldecode($matches[2]);
     $page = isset($matches[3]) ? $matches[3] : 1;
     $api->search($keyword, $query, $page);
 }
+// Search History
 elseif ($uri === '/api/history' && $method === 'GET') {
     $api->getHistory();
 }
 elseif ($uri === '/api/history' && $method === 'DELETE') {
     $api->clearHistory();
 }
+// Favorites
 elseif ($uri === '/api/favorites' && $method === 'GET') {
     $api->getFavorites();
 }
@@ -47,6 +51,53 @@ elseif (preg_match('#^/api/favorites/(\d+)$#', $uri, $matches) && $method === 'D
     $id = $matches[1];
     $api->deleteFavorite($id);
 }
+// Mirror Radar Summary
+elseif ($uri === '/api/mirrors/radar/summary' && $method === 'GET') {
+    $api->getRadarSummary();
+}
+// Resources
+elseif ($uri === '/api/resources/categories' && $method === 'GET') {
+    $api->getResourceCategories();
+}
+elseif ($uri === '/api/resources' && $method === 'GET') {
+    $api->getResources();
+}
+elseif (preg_match('#^/api/resources/search/([^/]+)$#', $uri, $matches) && $method === 'GET') {
+    $keyword = urldecode($matches[1]);
+    $api->searchResources($keyword);
+}
+elseif (preg_match('#^/api/resources/(\d+)/check-all$#', $uri, $matches) && $method === 'POST') {
+    $id = $matches[1];
+    $api->checkResourceMirrors($id);
+}
+elseif (preg_match('#^/api/resources/(\d+)$#', $uri, $matches) && $method === 'GET') {
+    $id = $matches[1];
+    $api->getResource($id);
+}
+// Mirrors
+elseif ($uri === '/api/mirrors' && $method === 'GET') {
+    $api->getMirrors();
+}
+elseif (preg_match('#^/api/mirrors/(\d+)/check$#', $uri, $matches) && $method === 'POST') {
+    $id = $matches[1];
+    $api->checkMirror($id);
+}
+elseif (preg_match('#^/api/mirrors/(\d+)/toggle-available$#', $uri, $matches) && $method === 'POST') {
+    $id = $matches[1];
+    $api->toggleMirrorAvailable($id);
+}
+elseif (preg_match('#^/api/mirrors/(\d+)$#', $uri, $matches) && $method === 'GET') {
+    $id = $matches[1];
+    $api->getMirror($id);
+}
+// Admin Logs
+elseif ($uri === '/api/admin/logs/stats' && $method === 'GET') {
+    $api->getAdminLogStats();
+}
+elseif ($uri === '/api/admin/logs' && $method === 'GET') {
+    $api->getAdminLogs();
+}
+// 404
 else {
     http_response_code(404);
     echo json_encode(["message" => "Endpoint not found", "uri" => $uri]);
