@@ -22,6 +22,16 @@ $api = new ApiController();
 if ($uri === '/health' && $method === 'GET') {
     $api->healthCheck();
 } 
+// Admin Auth
+elseif ($uri === '/api/admin/login' && $method === 'POST') {
+    $api->adminLogin();
+}
+elseif ($uri === '/api/admin/logout' && $method === 'POST') {
+    $api->adminLogout();
+}
+elseif ($uri === '/api/admin/me' && $method === 'GET') {
+    $api->getCurrentAdmin();
+}
 // Providers
 elseif ($uri === '/api/providers' && $method === 'GET') {
     $api->getProviders();

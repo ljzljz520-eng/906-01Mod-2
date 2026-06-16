@@ -1,5 +1,9 @@
 import axios from 'axios'
 
+const TOKEN_KEY = 'admin_token'
+const TOKEN_EXPIRES_KEY = 'admin_token_expires'
+const ADMIN_INFO_KEY = 'admin_info'
+
 const api = axios.create({
   baseURL: '/api',
   timeout: 30000
@@ -7,9 +11,10 @@ const api = axios.create({
 
 api.interceptors.request.use(
   config => {
-    const adminName = localStorage.getItem('admin_name')
-    if (adminName) {
-      config.headers['X-Admin-Name'] = adminName
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`
+      config.headers['X-Admin-Token'] = token
     }
     return config
   },
@@ -23,10 +28,41 @@ api.interceptors.response.use(
     return response.data
   },
   error => {
+    if (error.response?.status === 401) {
+      clearAuth()
+    }
     console.error('API Error:', error)
     return Promise.reject(error)
   }
 )
+
+export const setAuth = (token, expiresAt, adminInfo) => {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(TOKEN_EXPIRES_KEY, expiresAt)
+  localStorage.setItem(ADMIN_INFO_KEY, JSON.stringify(adminInfo))
+}
+
+export const clearAuth = () => {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(TOKEN_EXPIRES_KEY)
+  localStorage.removeItem(ADMIN_INFO_KEY)
+}
+
+export const getAdminInfo = () => {
+  try {
+    const info = localStorage.getItem(ADMIN_INFO_KEY)
+    return info ? JSON.parse(info) : null
+  } catch {
+    return null
+  }
+}
+
+export const isAuthenticated = () => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  const expires = localStorage.getItem(TOKEN_EXPIRES_KEY)
+  if (!token || !expires) return false
+  return new Date(expires) > new Date()
+}
 
 export default {
   getProviders() {
@@ -57,6 +93,18 @@ export default {
     return api.delete(`/favorites/${id}`)
   },
 
+  adminLogin(username, password) {
+    return api.post('/admin/login', { username, password })
+  },
+
+  adminLogout() {
+    return api.post('/admin/logout')
+  },
+
+  getCurrentAdmin() {
+    return api.get('/admin/me')
+  },
+
   getResources(category = null) {
     return api.get('/resources', { params: category ? { category } : {} })
   },
@@ -73,8 +121,8 @@ export default {
     return api.get('/resources/categories')
   },
 
-  checkResourceMirrors(resourceId, adminName = null) {
-    return api.post(`/resources/${resourceId}/check-all`, { admin_name: adminName })
+  checkResourceMirrors(resourceId) {
+    return api.post(`/resources/${resourceId}/check-all`)
   },
 
   getMirrors(status = null) {
@@ -85,12 +133,12 @@ export default {
     return api.get(`/mirrors/${id}`)
   },
 
-  checkMirror(mirrorId, adminName = null) {
-    return api.post(`/mirrors/${mirrorId}/check`, { admin_name: adminName })
+  checkMirror(mirrorId) {
+    return api.post(`/mirrors/${mirrorId}/check`)
   },
 
-  toggleMirrorAvailable(mirrorId, adminName = null) {
-    return api.post(`/mirrors/${mirrorId}/toggle-available`, { admin_name: adminName })
+  toggleMirrorAvailable(mirrorId) {
+    return api.post(`/mirrors/${mirrorId}/toggle-available`)
   },
 
   getRadarSummary() {
@@ -106,5 +154,7 @@ export default {
 
   getAdminLogStats() {
     return api.get('/admin/logs/stats')
-  }
+  },
+
+  _auth: { setAuth, clearAuth, getAdminInfo, isAuthenticated }
 }

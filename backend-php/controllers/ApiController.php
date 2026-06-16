@@ -5,16 +5,21 @@ require_once __DIR__ . '/../models/Favorite.php';
 require_once __DIR__ . '/../models/Resource.php';
 require_once __DIR__ . '/../models/MirrorSync.php';
 require_once __DIR__ . '/../models/AdminLog.php';
+require_once __DIR__ . '/../models/AdminUser.php';
 
 class ApiController {
+    const DEMO_MODE = true;
+
     private $db;
     private $searchHistory;
     private $favorite;
     private $resource;
     private $mirrorSync;
     private $adminLog;
+    private $adminUser;
 
     private $currentAdmin;
+    private $currentAdminUser;
 
     public function __construct() {
         $database = new Database();
@@ -24,8 +29,39 @@ class ApiController {
         $this->resource = new Resource($this->db);
         $this->mirrorSync = new MirrorSync($this->db);
         $this->adminLog = new AdminLog($this->db);
+        $this->adminUser = new AdminUser($this->db);
 
-        $this->currentAdmin = $_SERVER['HTTP_X_ADMIN_NAME'] ?? 'admin';
+        $this->authenticateAdmin();
+    }
+
+    private function authenticateAdmin() {
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '';
+        $this->currentAdmin = null;
+        $this->currentAdminUser = null;
+
+        if (!$authHeader) return;
+
+        if (strpos($authHeader, 'Bearer ') === 0) {
+            $authHeader = substr($authHeader, 7);
+        }
+
+        $user = $this->adminUser->validateSessionToken($authHeader);
+        if ($user) {
+            $this->currentAdminUser = $user;
+            $this->currentAdmin = $user['display_name'];
+        }
+    }
+
+    private function requireAdminAuth() {
+        if (!$this->currentAdminUser) {
+            http_response_code(401);
+            echo json_encode([
+                'success' => false,
+                'message' => '需要管理员权限，请先登录',
+                'code' => 'AUTH_REQUIRED'
+            ]);
+            exit();
+        }
     }
 
     private function getClientIp() {
@@ -35,12 +71,90 @@ class ApiController {
             ?? '127.0.0.1';
     }
 
+    private function getUserAgent() {
+        return $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+    }
+
     // GET /health
     public function healthCheck() {
         echo json_encode([
             'status' => 'ok',
             'timestamp' => date('c'),
-            'service' => 'Torrent Search API (PHP)'
+            'service' => 'Open Source Resource Index API',
+            'demo_mode' => self::DEMO_MODE,
+            'auth' => [
+                'is_authenticated' => !empty($this->currentAdminUser),
+                'admin' => $this->currentAdmin
+            ]
+        ]);
+    }
+
+    // POST /api/admin/login
+    public function adminLogin() {
+        $data = json_decode(file_get_contents("php://input"), true);
+        $username = $data['username'] ?? '';
+        $password = $data['password'] ?? '';
+
+        if (!$username || !$password) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => '用户名和密码不能为空']);
+            return;
+        }
+
+        $result = $this->adminUser->login($username, $password, $this->getClientIp());
+
+        if ($result['success']) {
+            $this->adminLog->logAction(
+                $result['data']['display_name'],
+                'login',
+                'admin_user',
+                $result['data']['user_id'],
+                "管理员登录成功（角色：{$result['data']['role']}）",
+                $this->getClientIp(),
+                $this->getUserAgent(),
+                $result['data']['user_id']
+            );
+            $result['data']['demo_mode'] = self::DEMO_MODE;
+            echo json_encode($result);
+        } else {
+            http_response_code(401);
+            echo json_encode($result);
+        }
+    }
+
+    // POST /api/admin/logout
+    public function adminLogout() {
+        if ($this->currentAdminUser) {
+            $this->adminLog->logAction(
+                $this->currentAdmin,
+                'logout',
+                'admin_user',
+                $this->currentAdminUser['id'],
+                '管理员登出',
+                $this->getClientIp(),
+                $this->getUserAgent(),
+                $this->currentAdminUser['id']
+            );
+        }
+        echo json_encode(['success' => true, 'message' => '已退出登录']);
+    }
+
+    // GET /api/admin/me
+    public function getCurrentAdmin() {
+        if (!$this->currentAdminUser) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => '未登录']);
+            return;
+        }
+        echo json_encode([
+            'success' => true,
+            'data' => [
+                'user_id' => $this->currentAdminUser['id'],
+                'username' => $this->currentAdminUser['username'],
+                'display_name' => $this->currentAdmin,
+                'role' => $this->currentAdminUser['role'],
+                'demo_mode' => self::DEMO_MODE
+            ]
         ]);
     }
 
@@ -230,8 +344,8 @@ class ApiController {
 
     // POST /api/mirrors/:id/check
     public function checkMirror($id) {
-        $data = json_decode(file_get_contents("php://input"), true);
-        $adminName = $data['admin_name'] ?? $this->currentAdmin;
+        $this->requireAdminAuth();
+        $adminName = $this->currentAdmin;
 
         $mirror = $this->mirrorSync->findOne($id);
         if (!$mirror) {
@@ -240,7 +354,7 @@ class ApiController {
             return;
         }
 
-        $result = $this->mirrorSync->checkMirror($id, $adminName);
+        $result = $this->mirrorSync->checkMirror($id, $adminName, self::DEMO_MODE);
 
         if ($result['success']) {
             $this->adminLog->logAction(
@@ -248,14 +362,17 @@ class ApiController {
                 'manual_check',
                 'mirror',
                 $id,
-                "手动触发复测镜像 #{$id} ({$mirror['mirror_name']})，结果：{$result['data']['sync_status']}",
-                $this->getClientIp()
+                "手动触发复测镜像 #{$id} ({$mirror['mirror_name']})，结果：{$result['data']['sync_status']}" . (self::DEMO_MODE ? " [演示模式]" : ""),
+                $this->getClientIp(),
+                $this->getUserAgent(),
+                $this->currentAdminUser['id']
             );
             echo json_encode([
                 'success' => true,
                 'message' => '复测完成',
                 'data' => $result['data'],
-                'checked_by' => $adminName
+                'checked_by' => $adminName,
+                'demo_mode' => self::DEMO_MODE
             ]);
         } else {
             http_response_code(500);
@@ -265,8 +382,8 @@ class ApiController {
 
     // POST /api/resources/:id/check-all
     public function checkResourceMirrors($id) {
-        $data = json_decode(file_get_contents("php://input"), true);
-        $adminName = $data['admin_name'] ?? $this->currentAdmin;
+        $this->requireAdminAuth();
+        $adminName = $this->currentAdmin;
 
         $resource = $this->resource->findOne($id);
         if (!$resource) {
@@ -279,7 +396,7 @@ class ApiController {
         $results = [];
 
         foreach ($mirrors as $mirror) {
-            $checkResult = $this->mirrorSync->checkMirror($mirror['id'], $adminName);
+            $checkResult = $this->mirrorSync->checkMirror($mirror['id'], $adminName, self::DEMO_MODE);
             $results[] = [
                 'mirror_id' => $mirror['id'],
                 'mirror_name' => $mirror['mirror_name'],
@@ -293,22 +410,25 @@ class ApiController {
             'manual_check',
             'resource',
             $id,
-            "批量复测资源「{$resource['name']}」的所有镜像，共" . count($results) . "个",
-            $this->getClientIp()
+            "批量复测资源「{$resource['name']}」的所有镜像，共" . count($results) . "个" . (self::DEMO_MODE ? " [演示模式]" : ""),
+            $this->getClientIp(),
+            $this->getUserAgent(),
+            $this->currentAdminUser['id']
         );
 
         echo json_encode([
             'success' => true,
             'message' => '批量复测完成',
             'data' => $results,
-            'checked_by' => $adminName
+            'checked_by' => $adminName,
+            'demo_mode' => self::DEMO_MODE
         ]);
     }
 
     // POST /api/mirrors/:id/toggle-available
     public function toggleMirrorAvailable($id) {
-        $data = json_decode(file_get_contents("php://input"), true);
-        $adminName = $data['admin_name'] ?? $this->currentAdmin;
+        $this->requireAdminAuth();
+        $adminName = $this->currentAdmin;
 
         $mirror = $this->mirrorSync->findOne($id);
         if (!$mirror) {
@@ -327,7 +447,9 @@ class ApiController {
                 'mirror',
                 $id,
                 "将镜像 #{$id} ({$mirror['mirror_name']}) 标记为{$statusText}",
-                $this->getClientIp()
+                $this->getClientIp(),
+                $this->getUserAgent(),
+                $this->currentAdminUser['id']
             );
             echo json_encode([
                 'success' => true,

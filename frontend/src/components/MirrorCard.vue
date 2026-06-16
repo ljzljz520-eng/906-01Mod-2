@@ -153,9 +153,9 @@
       </button>
       <button
         @click="$emit('check', mirror.id)"
-        :disabled="!adminName || checkingMirrorId === mirror.id"
-        class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 text-indigo-600 rounded-xl text-sm font-semibold transition-all flex items-center justify-center"
-        :title="adminName ? '手动触发复测' : '请先设置管理员标识'"
+        :disabled="!isAuthenticated || checkingMirrorId === mirror.id"
+        class="px-3 py-2.5 bg-indigo-50 hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-600 rounded-xl text-sm font-semibold transition-all flex items-center justify-center"
+        :title="isAuthenticated ? '手动触发复测' : '请先登录管理员账户'"
       >
         <svg v-if="checkingMirrorId !== mirror.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
@@ -166,7 +166,7 @@
         </svg>
       </button>
       <button
-        v-if="adminName"
+        v-if="isAuthenticated"
         @click="$emit('toggle', mirror.id)"
         class="px-3 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center"
         :class="isAvailable ? 'bg-amber-50 hover:bg-amber-100 text-amber-600' : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-600'"
@@ -189,7 +189,7 @@ import { computed } from 'vue'
 const props = defineProps({
   mirror: { type: Object, required: true },
   resource: { type: Object, default: null },
-  adminName: { type: String, default: '' },
+  isAuthenticated: { type: Boolean, default: false },
   checkingMirrorId: { type: [Number, String, null], default: null }
 })
 

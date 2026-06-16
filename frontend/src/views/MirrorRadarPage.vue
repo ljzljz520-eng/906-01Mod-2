@@ -1,5 +1,24 @@
 <template>
   <div class="space-y-6 min-h-screen pb-16">
+    <!-- Demo Mode Banner -->
+    <div class="bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-5 flex items-center gap-4">
+      <div class="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+        <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <h3 class="text-amber-900 font-bold text-lg">当前为演示模式</h3>
+        <p class="text-amber-700 mt-0.5">镜像健康检查结果基于概率算法模拟生成，仅用于界面演示。需配置真实 API Token 后切换到正式模式。</p>
+      </div>
+      <div class="flex-shrink-0 hidden sm:block">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">
+          <span class="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+          DEMO MODE
+        </span>
+      </div>
+    </div>
+
     <!-- Header -->
     <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900 rounded-3xl p-8 text-white shadow-2xl">
       <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -15,17 +34,38 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-xl">
-            <svg class="w-5 h-5 text-cyan-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <input
-              v-model="adminName"
-              @change="saveAdminName"
-              type="text"
-              placeholder="管理员标识"
-              class="bg-transparent border-none outline-none text-white placeholder-slate-400 w-32"
-            />
+          <div v-if="!currentAdmin" class="flex items-center gap-2">
+            <button
+              @click="showLoginModal = true"
+              class="px-5 py-2.5 bg-white/10 backdrop-blur hover:bg-white/20 rounded-xl font-medium transition-all flex items-center gap-2 border border-white/20"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+              </svg>
+              管理员登录
+            </button>
+          </div>
+          <div v-else class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-white/10 backdrop-blur px-4 py-2 rounded-xl border border-white/20">
+              <div class="w-8 h-8 bg-gradient-to-br from-emerald-400 to-cyan-500 rounded-lg flex items-center justify-center">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </div>
+              <div class="text-sm min-w-0">
+                <div class="font-semibold text-white truncate">{{ currentAdmin.display_name }}</div>
+                <div class="text-slate-400 text-xs">{{ getRoleLabel(currentAdmin.role) }}</div>
+              </div>
+            </div>
+            <button
+              @click="handleLogout"
+              class="px-4 py-2.5 bg-white/10 backdrop-blur hover:bg-red-500/80 rounded-xl font-medium transition-all flex items-center gap-2 border border-white/20"
+              title="退出登录"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
           <button
             @click="refreshAll"
@@ -222,9 +262,9 @@
                 </div>
                 <button
                   @click="checkAllMirrors(resource)"
-                  :disabled="!adminName || checkingResourceId === resource.id"
-                  class="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 text-white rounded-xl font-medium transition-all flex items-center gap-2 shadow-md"
-                  :title="adminName ? '批量复测所有镜像' : '请先设置管理员标识'"
+                  :disabled="!currentAdmin || checkingResourceId === resource.id"
+                  class="px-4 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all flex items-center gap-2 shadow-md"
+                  :title="currentAdmin ? '批量复测所有镜像' : '请先登录管理员账户'"
                 >
                   <svg v-if="checkingResourceId !== resource.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -244,7 +284,7 @@
                 :key="mirror.id"
                 :mirror="mirror"
                 :resource="resource"
-                :admin-name="adminName"
+                :is-authenticated="!!currentAdmin"
                 :checking-mirror-id="checkingMirrorId"
                 @check="handleCheckMirror"
                 @toggle="handleToggleAvailable"
@@ -309,6 +349,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   {{ log.admin_name }}
+                  <span v-if="log.admin_role" class="text-xs opacity-70">({{ getRoleLabel(log.admin_role) }})</span>
                 </span>
               </td>
               <td class="px-6 py-3">
@@ -332,6 +373,97 @@
         </div>
       </div>
     </div>
+
+    <!-- Login Modal -->
+    <transition name="modal-fade">
+      <div v-if="showLoginModal" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" @click="showLoginModal = false"></div>
+        <div class="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div class="bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900 p-8 text-center">
+            <div class="w-20 h-20 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg mb-4">
+              <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-white">管理员登录</h2>
+            <p class="text-slate-300 mt-1">登录后方可执行复测及镜像操作</p>
+          </div>
+          <div class="p-8">
+            <form @submit.prevent="handleLogin" class="space-y-5">
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">用户名</label>
+                <div class="relative">
+                  <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  <input
+                    v-model="loginForm.username"
+                    type="text"
+                    placeholder="admin"
+                    required
+                    class="w-full pl-12 pr-4 py-3.5 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-slate-900"
+                    :class="loginError ? 'border-red-400 ring-4 ring-red-100' : ''"
+                  />
+                </div>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-2">密码</label>
+                <div class="relative">
+                  <svg class="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <input
+                    v-model="loginForm.password"
+                    :type="showPassword ? 'text' : 'password'"
+                    placeholder="••••••••"
+                    required
+                    class="w-full pl-12 pr-12 py-3.5 border-2 border-slate-200 rounded-xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 outline-none transition-all text-slate-900"
+                    :class="loginError ? 'border-red-400 ring-4 ring-red-100' : ''"
+                  />
+                  <button
+                    type="button"
+                    @click="showPassword = !showPassword"
+                    class="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <svg v-if="!showPassword" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.542 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div v-if="loginError" class="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <svg class="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span class="text-sm text-red-700">{{ loginError }}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs text-slate-500">
+                <span>演示账户：</span>
+                <code class="px-2 py-0.5 bg-slate-100 rounded font-mono text-slate-700">admin / admin123</code>
+              </div>
+              <button
+                type="submit"
+                :disabled="loginLoading"
+                class="w-full py-3.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 disabled:opacity-50 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2"
+              >
+                <svg v-if="!loginLoading" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+                </svg>
+                <svg v-else class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                </svg>
+                {{ loginLoading ? '验证中...' : '安全登录' }}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Toast -->
     <transition name="toast">
@@ -357,10 +489,10 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
-import api from '../api'
+import api, { _auth } from '../api'
 import MirrorCard from '../components/MirrorCard.vue'
 
-const adminName = ref(localStorage.getItem('admin_name') || '')
+const currentAdmin = ref(_auth.getAdminInfo())
 const radarSummary = ref({ by_type: [], totals: null })
 const resources = ref([])
 const categories = ref([])
@@ -373,6 +505,12 @@ const loadingLogs = ref(false)
 const checkingResourceId = ref(null)
 const checkingMirrorId = ref(null)
 const toast = ref({ show: false, message: '', type: 'success' })
+
+const showLoginModal = ref(false)
+const loginLoading = ref(false)
+const loginError = ref('')
+const showPassword = ref(false)
+const loginForm = ref({ username: '', password: '' })
 
 let searchTimer = null
 
@@ -392,13 +530,6 @@ const healthRateClass = computed(() => {
   return 'bg-gradient-to-r from-rose-400 to-red-500'
 })
 
-const saveAdminName = () => {
-  localStorage.setItem('admin_name', adminName.value)
-  if (adminName.value) {
-    showToast(`管理员标识已设置为: ${adminName.value}`, 'success')
-  }
-}
-
 const showToast = (message, type = 'success') => {
   toast.value = { show: true, message, type }
   setTimeout(() => { toast.value.show = false }, 3500)
@@ -415,6 +546,11 @@ const formatTime = (timeStr) => {
     minute: '2-digit',
     second: '2-digit'
   })
+}
+
+const getRoleLabel = (role) => {
+  const labels = { super_admin: '超级管理员', admin: '管理员', operator: '运维操作员' }
+  return labels[role] || '管理员'
 }
 
 const getMirrorTypeName = (type) => {
@@ -443,7 +579,7 @@ const getMirrorTypeIconClass = (type) => {
 }
 
 const getActionName = (type) => {
-  const names = { manual_check: '手动复测', toggle_available: '切换可用', update_mirror: '更新镜像' }
+  const names = { manual_check: '手动复测', toggle_available: '切换可用', update_mirror: '更新镜像', login: '登录', logout: '登出' }
   return names[type] || type
 }
 
@@ -451,9 +587,49 @@ const getActionClass = (type) => {
   const classes = {
     manual_check: 'bg-blue-100 text-blue-700',
     toggle_available: 'bg-amber-100 text-amber-700',
-    update_mirror: 'bg-purple-100 text-purple-700'
+    update_mirror: 'bg-purple-100 text-purple-700',
+    login: 'bg-emerald-100 text-emerald-700',
+    logout: 'bg-slate-100 text-slate-700'
   }
   return classes[type] || 'bg-slate-100 text-slate-700'
+}
+
+const handleLogin = async () => {
+  loginError.value = ''
+  loginLoading.value = true
+  try {
+    const res = await api.adminLogin(loginForm.value.username, loginForm.value.password)
+    if (res.success) {
+      const userInfo = {
+        user_id: res.data.user_id,
+        username: res.data.username,
+        display_name: res.data.display_name,
+        role: res.data.role
+      }
+      _auth.setAuth(res.data.token, res.data.token_expires_at, userInfo)
+      currentAdmin.value = userInfo
+      showLoginModal.value = false
+      loginForm.value = { username: '', password: '' }
+      showToast(`欢迎回来，${userInfo.display_name}！`, 'success')
+      loadAdminLogs()
+    }
+  } catch (e) {
+    loginError.value = e.response?.data?.message || '登录失败，请检查用户名和密码'
+  } finally {
+    loginLoading.value = false
+  }
+}
+
+const handleLogout = async () => {
+  try {
+    await api.adminLogout()
+  } catch (e) {
+    console.warn('登出请求失败:', e)
+  }
+  _auth.clearAuth()
+  currentAdmin.value = null
+  showToast('已退出管理员登录', 'success')
+  loadAdminLogs()
 }
 
 const loadRadarSummary = async () => {
@@ -526,13 +702,13 @@ const refreshAll = async () => {
 }
 
 const checkAllMirrors = async (resource) => {
-  if (!adminName.value) {
-    showToast('请先设置管理员标识', 'error')
+  if (!currentAdmin.value) {
+    showLoginModal.value = true
     return
   }
   checkingResourceId.value = resource.id
   try {
-    const res = await api.checkResourceMirrors(resource.id, adminName.value)
+    const res = await api.checkResourceMirrors(resource.id)
     if (res.success) {
       const detail = await api.getResource(resource.id)
       if (detail.success) {
@@ -545,20 +721,27 @@ const checkAllMirrors = async (resource) => {
       showToast(res.message || '复测失败', 'error')
     }
   } catch (e) {
-    showToast('复测失败: ' + (e.response?.data?.message || e.message), 'error')
+    if (e.response?.status === 401) {
+      showLoginModal.value = true
+      _auth.clearAuth()
+      currentAdmin.value = null
+      showToast('登录状态已过期，请重新登录', 'error')
+    } else {
+      showToast('复测失败: ' + (e.response?.data?.message || e.message), 'error')
+    }
   } finally {
     checkingResourceId.value = null
   }
 }
 
 const handleCheckMirror = async (mirrorId) => {
-  if (!adminName.value) {
-    showToast('请先设置管理员标识', 'error')
+  if (!currentAdmin.value) {
+    showLoginModal.value = true
     return
   }
   checkingMirrorId.value = mirrorId
   try {
-    const res = await api.checkMirror(mirrorId, adminName.value)
+    const res = await api.checkMirror(mirrorId)
     if (res.success) {
       for (const r of resources.value) {
         const idx = r.mirrors?.findIndex(m => m.id === mirrorId)
@@ -574,19 +757,26 @@ const handleCheckMirror = async (mirrorId) => {
       showToast(res.message || '复测失败', 'error')
     }
   } catch (e) {
-    showToast('复测失败: ' + (e.response?.data?.message || e.message), 'error')
+    if (e.response?.status === 401) {
+      showLoginModal.value = true
+      _auth.clearAuth()
+      currentAdmin.value = null
+      showToast('登录状态已过期，请重新登录', 'error')
+    } else {
+      showToast('复测失败: ' + (e.response?.data?.message || e.message), 'error')
+    }
   } finally {
     checkingMirrorId.value = null
   }
 }
 
 const handleToggleAvailable = async (mirrorId) => {
-  if (!adminName.value) {
-    showToast('请先设置管理员标识', 'error')
+  if (!currentAdmin.value) {
+    showLoginModal.value = true
     return
   }
   try {
-    const res = await api.toggleMirrorAvailable(mirrorId, adminName.value)
+    const res = await api.toggleMirrorAvailable(mirrorId)
     if (res.success) {
       for (const r of resources.value) {
         const idx = r.mirrors?.findIndex(m => m.id === mirrorId)
@@ -601,11 +791,21 @@ const handleToggleAvailable = async (mirrorId) => {
       showToast(res.message || '操作失败', 'error')
     }
   } catch (e) {
-    showToast('操作失败: ' + (e.response?.data?.message || e.message), 'error')
+    if (e.response?.status === 401) {
+      showLoginModal.value = true
+      _auth.clearAuth()
+      currentAdmin.value = null
+      showToast('登录状态已过期，请重新登录', 'error')
+    } else {
+      showToast('操作失败: ' + (e.response?.data?.message || e.message), 'error')
+    }
   }
 }
 
 onMounted(() => {
+  if (_auth.isAuthenticated()) {
+    currentAdmin.value = _auth.getAdminInfo()
+  }
   loadRadarSummary()
   loadCategories()
   loadResources()
@@ -621,6 +821,18 @@ onMounted(() => {
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
+  transform: translateY(20px) scale(0.95);
+}
+.modal-fade-enter-active,
+.modal-fade-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.modal-fade-enter-from,
+.modal-fade-leave-to {
+  opacity: 0;
+}
+.modal-fade-enter-from > div:last-child,
+.modal-fade-leave-to > div:last-child {
   transform: translateY(20px) scale(0.95);
 }
 </style>

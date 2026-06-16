@@ -109,20 +109,46 @@ CREATE TABLE IF NOT EXISTS mirror_sync (
   CONSTRAINT fk_mirror_resource FOREIGN KEY (resource_id) REFERENCES resources(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='镜像同步表';
 
+-- 创建管理员账户表
+CREATE TABLE IF NOT EXISTS admin_users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(100) NOT NULL UNIQUE COMMENT '管理员用户名',
+  password_hash VARCHAR(255) NOT NULL COMMENT '密码哈希',
+  display_name VARCHAR(100) NOT NULL COMMENT '显示名称',
+  role ENUM('super_admin', 'admin', 'operator') DEFAULT 'operator' COMMENT '角色',
+  last_login_at TIMESTAMP NULL COMMENT '最近登录时间',
+  last_login_ip VARCHAR(45) COMMENT '最近登录IP',
+  is_active TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_username (username),
+  INDEX idx_is_active (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员账户表';
+
 -- 创建管理员操作日志表
 CREATE TABLE IF NOT EXISTS admin_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  admin_name VARCHAR(100) NOT NULL COMMENT '管理员名称',
-  action_type ENUM('manual_check', 'toggle_available', 'update_mirror') NOT NULL COMMENT '操作类型',
+  admin_id INT COMMENT '管理员ID',
+  admin_name VARCHAR(100) NOT NULL COMMENT '管理员名称（冗余）',
+  action_type ENUM('manual_check', 'toggle_available', 'update_mirror', 'login', 'logout') NOT NULL COMMENT '操作类型',
   target_type VARCHAR(50) COMMENT '目标类型',
   target_id INT COMMENT '目标ID',
   details TEXT COMMENT '操作详情',
   ip_address VARCHAR(45) COMMENT 'IP地址',
+  user_agent VARCHAR(500) COMMENT 'User Agent',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
+  INDEX idx_admin_id (admin_id),
   INDEX idx_admin_name (admin_name),
   INDEX idx_action_type (action_type),
-  INDEX idx_created_at (created_at)
+  INDEX idx_created_at (created_at),
+  CONSTRAINT fk_admin_log_user FOREIGN KEY (admin_id) REFERENCES admin_users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='管理员操作日志表';
+
+-- 插入默认管理员账户（密码: admin123）
+INSERT INTO admin_users (username, password_hash, display_name, role) VALUES
+('admin', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '超级管理员', 'super_admin'),
+('operator_zhang', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '张运维', 'operator'),
+('mirror_bot', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '镜像同步机器人', 'operator');
 
 -- 插入示例资源数据
 INSERT INTO resources (name, description, original_url, category, size, checksum, checksum_type, original_updated_at) VALUES

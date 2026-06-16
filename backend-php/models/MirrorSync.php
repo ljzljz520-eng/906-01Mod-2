@@ -139,7 +139,7 @@ class MirrorSync {
         return $stmt->execute();
     }
 
-    public function checkMirror($id, $adminName = 'system') {
+    public function checkMirror($id, $adminName = 'system', $demoMode = true) {
         $resourceQuery = "SELECT r.* FROM resources r 
             INNER JOIN " . $this->table_name . " m ON r.id = m.resource_id 
             WHERE m.id = :id";
@@ -157,7 +157,20 @@ class MirrorSync {
             return ['success' => false, 'message' => '镜像不存在'];
         }
 
-        $result = $this->simulateMirrorCheck($resource, $mirror);
+        if ($demoMode) {
+            $result = $this->simulateMirrorCheck($resource, $mirror);
+            $result['is_simulated'] = true;
+        } else {
+            $realResult = $this->realMirrorCheck($resource, $mirror);
+            if ($realResult === null) {
+                $result = $this->simulateMirrorCheck($resource, $mirror);
+                $result['is_simulated'] = true;
+                $result['fallback_reason'] = '真实检查未配置，已使用模拟检查';
+            } else {
+                $result = $realResult;
+                $result['is_simulated'] = false;
+            }
+        }
 
         $updateQuery = "UPDATE " . $this->table_name . " SET 
             sync_status=:sync_status,
@@ -190,9 +203,58 @@ class MirrorSync {
         $updateStmt->bindParam(":id", $id, PDO::PARAM_INT);
 
         if ($updateStmt->execute()) {
-            return ['success' => true, 'data' => $this->findOne($id)];
+            $updated = $this->findOne($id);
+            $updated['is_simulated'] = $result['is_simulated'] ?? true;
+            if (!empty($result['fallback_reason'])) {
+                $updated['fallback_reason'] = $result['fallback_reason'];
+            }
+            return ['success' => true, 'data' => $updated];
         }
         return ['success' => false, 'message' => '更新失败'];
+    }
+
+    private function realMirrorCheck($resource, $mirror) {
+        switch ($mirror['mirror_type']) {
+            case 'github':
+                return $this->checkGitHubMirror($resource, $mirror);
+            case 'gitee':
+                return $this->checkGiteeMirror($resource, $mirror);
+            case 'enterprise':
+                return $this->checkEnterpriseMirror($resource, $mirror);
+            case 'oss':
+                return $this->checkOSSMirror($resource, $mirror);
+            default:
+                return null;
+        }
+    }
+
+    private function checkGitHubMirror($resource, $mirror) {
+        $githubToken = getenv('GITHUB_TOKEN');
+        if (!$githubToken || !$mirror['mirror_url']) return null;
+
+        return null;
+    }
+
+    private function checkGiteeMirror($resource, $mirror) {
+        $giteeToken = getenv('GITEE_TOKEN');
+        if (!$giteeToken || !$mirror['mirror_url']) return null;
+
+        return null;
+    }
+
+    private function checkEnterpriseMirror($resource, $mirror) {
+        $enterpriseEndpoint = getenv('ENTERPRISE_MIRROR_ENDPOINT');
+        if (!$enterpriseEndpoint || !$mirror['mirror_url']) return null;
+
+        return null;
+    }
+
+    private function checkOSSMirror($resource, $mirror) {
+        $ossAccessKey = getenv('OSS_ACCESS_KEY');
+        $ossSecretKey = getenv('OSS_SECRET_KEY');
+        if (!$ossAccessKey || !$ossSecretKey || !$mirror['mirror_url']) return null;
+
+        return null;
     }
 
     private function simulateMirrorCheck($resource, $mirror) {
